@@ -1,6 +1,6 @@
 module gutils
 
-go 1.23.2
+go 1.22.0
 
 require (
 	github.com/btcsuite/btcutil v1.0.2
