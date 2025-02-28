@@ -1,4 +1,4 @@
-module gutils
+module github.com/ville-vv/gutils
 
 go 1.22.0
 
