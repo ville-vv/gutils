@@ -2,6 +2,8 @@ module github.com/ville-vv/gutils
 
 go 1.22.0
 
+toolchain go1.23.4
+
 require (
 	github.com/btcsuite/btcutil v1.0.2
 	github.com/bwmarrin/snowflake v0.3.0
