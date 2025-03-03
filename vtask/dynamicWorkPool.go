@@ -16,17 +16,55 @@ var (
 
 type Task func()
 
-type DynamicWorkOption func(*DynamicWorkPool)
+type DynamicWorkOption func(*DynamicWorkOptions)
+
+type DynamicWorkOptions struct {
+	minWorkers     int64
+	maxWorkers     int64
+	manageInterval time.Duration
+}
+
+func getDynamicWorkOptions(opts ...DynamicWorkOption) *DynamicWorkOptions {
+	options := &DynamicWorkOptions{}
+	for _, opt := range opts {
+		opt(options)
+	}
+	return options
+}
+
+func (sel *DynamicWorkOptions) GetMinWorkers() int64 {
+	return sel.minWorkers
+}
+
+func (sel *DynamicWorkOptions) GetMaxWorkers() int64 {
+	if sel.maxWorkers <= 0 {
+		sel.maxWorkers = 1000
+	}
+	return sel.maxWorkers
+}
+
+func (sel *DynamicWorkOptions) GetManageInterval() time.Duration {
+	if sel.manageInterval <= 0 {
+		sel.manageInterval = 1 * time.Second
+	}
+	return sel.manageInterval
+}
 
 func WithMinWorkers(minWorkers int64) DynamicWorkOption {
-	return func(sel *DynamicWorkPool) {
+	return func(sel *DynamicWorkOptions) {
 		sel.minWorkers = minWorkers
 	}
 }
 
 func WithMaxWorkers(maxWorkers int64) DynamicWorkOption {
-	return func(sel *DynamicWorkPool) {
+	return func(sel *DynamicWorkOptions) {
 		sel.maxWorkers = maxWorkers
+	}
+}
+
+func WithManageInterval(val time.Duration) DynamicWorkOption {
+	return func(sel *DynamicWorkOptions) {
+		sel.manageInterval = val
 	}
 }
 
@@ -39,6 +77,7 @@ type DynamicWorkPool struct {
 	processedTasks int64         // 已处理任务数
 	queueLength    int64         // 队列长度
 	submitErrs     int64         // 提交错误数
+	manageInterval time.Duration // 管理间隔时间
 	taskQueue      chan Task     // 存放任务的队列
 	adjustChan     chan struct{} // 调整信号通道
 	workerStopCh   chan struct{} // 用来控制工作协程数量
@@ -52,15 +91,11 @@ func NewDynamicWorkPool(opts ...DynamicWorkOption) *DynamicWorkPool {
 		stopCh:     make(chan struct{}),
 		adjustChan: make(chan struct{}, 1),
 	}
-	for _, opt := range opts {
-		opt(sel)
-	}
-	if sel.minWorkers <= 0 {
-		sel.minWorkers = 1
-	}
-	if sel.maxWorkers <= 0 {
-		sel.maxWorkers = 1000
-	}
+
+	options := getDynamicWorkOptions(opts...)
+	sel.minWorkers = options.GetMinWorkers()
+	sel.maxWorkers = options.GetMaxWorkers()
+	sel.manageInterval = options.GetManageInterval()
 	if sel.maxWorkers < sel.minWorkers {
 		sel.maxWorkers = sel.minWorkers * 2
 	}
@@ -172,7 +207,7 @@ func (sel *DynamicWorkPool) triggerAdjust() bool {
 
 func (sel *DynamicWorkPool) manager() {
 	defer sel.wg.Done()
-	ticker := time.NewTicker(100 * time.Millisecond)
+	ticker := time.NewTicker(sel.manageInterval)
 	defer ticker.Stop()
 	for {
 		select {
