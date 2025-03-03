@@ -83,7 +83,6 @@ func (sel *DynamicWorkPool) entryTask(task Task) bool {
 	select {
 	case <-sel.stopCh:
 	default:
-		return false
 	}
 	select {
 	case sel.taskQueue <- task:
