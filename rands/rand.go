@@ -2,6 +2,7 @@ package rands
 
 import (
 	"math/rand"
+	"time"
 	"unsafe"
 )
 
@@ -69,4 +70,16 @@ func GenNumber(n int) string {
 		remain--
 	}
 	return *(*string)(unsafe.Pointer(&b))
+}
+
+var (
+	randSource = rand.NewSource(time.Now().UnixNano())
+	randGen    = rand.New(randSource)
+)
+
+func GenRangeInt(min, max int) int {
+	if min > max {
+		min, max = max, min
+	}
+	return randGen.Intn(max-min+1) + min
 }

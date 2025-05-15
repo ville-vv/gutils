@@ -115,6 +115,42 @@ func NewZLog(cfg LogConfig) *zap.Logger {
 	return zap.New(core, zap.AddCaller()).Named(cfg.Name)
 }
 
+func NewZLogNoCaller(cfg LogConfig) *zap.Logger {
+	encoder := zapcore.NewJSONEncoder(zapcore.EncoderConfig{
+		NewReflectedEncoder: JsonEncode, // 使用自定义的json 解析器，速度比较快，zap 默认使用的是 官方json包
+		TimeKey:             "time",
+		LevelKey:            "level",
+		NameKey:             "svc",
+		CallerKey:           "call",
+		MessageKey:          "msg",
+		StacktraceKey:       "stack",                        // 打印栈内容
+		EncodeLevel:         zapcore.LowercaseLevelEncoder,  // 小写编码器
+		EncodeTime:          zapcore.ISO8601TimeEncoder,     // ISO8601 UTC 时间格式
+		EncodeDuration:      zapcore.SecondsDurationEncoder, //
+		EncodeCaller:        zapcore.ShortCallerEncoder,     // 全路径编码器
+		EncodeName:          zapcore.FullNameEncoder,
+	})
+
+	level := getLogLevel(cfg.Level)
+	core := zapcore.NewCore(encoder, zapcore.AddSync(os.Stdout), level)
+	if cfg.Mode == "file" {
+		if cfg.Path == "" {
+			cfg.Path = "./logs"
+		}
+
+		if cfg.InfoFile == "" {
+			cfg.InfoFile = "z_info.log"
+		}
+
+		if cfg.ErrFile != "" {
+			core = newCoreWithErrFile(&cfg, level, encoder)
+		} else {
+			core = newCoreOnlyOneFile(&cfg, level, encoder)
+		}
+	}
+	return zap.New(core).Named(cfg.Name)
+}
+
 // 自定义本地时区时间编码器
 func localTimeEncoder(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
 	// 将时间转换为本地时间，并格式化为 YYYY-MM-DD HH:MM:SS
