@@ -8,7 +8,7 @@ import (
 )
 
 func TestRegister(t *testing.T) {
-	p := NewPack()
+	p := NewPacker()
 
 	buf := bytes.NewBufferString("")
 	err := p.WriteMsg(buf, "Hello Yes")

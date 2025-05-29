@@ -28,28 +28,28 @@ type cmdType uint16
 
 type Message interface{}
 
-type Package struct {
+type CmdFrame struct {
 	Cmd     cmdType
 	Payload []byte
 }
 
-func NewPackage(cmd cmdType) *Package {
-	return &Package{
+func NewCmdFrame(cmd cmdType) *CmdFrame {
+	return &CmdFrame{
 		Cmd: cmd,
 	}
 }
-func (sel *Package) Len() int {
+func (sel *CmdFrame) Len() int {
 	return len(sel.Payload) + HeaderLen
 }
 
-func (sel *Package) String() string {
+func (sel *CmdFrame) String() string {
 	return string(sel.Payload)
 }
 
-func (sel *Package) Decode(obj Message) error {
+func (sel *CmdFrame) Decode(obj Message) error {
 	return sonic.Unmarshal(sel.Payload, obj)
 }
-func (sel *Package) Encode(obj Message) error {
+func (sel *CmdFrame) Encode(obj Message) error {
 	data, err := sonic.Marshal(obj)
 	if err != nil {
 		return err
@@ -63,7 +63,7 @@ type Packer struct {
 	cmdTypeMap map[reflect.Type]cmdType
 }
 
-func NewPack() *Packer {
+func NewPacker() *Packer {
 	p := &Packer{
 		cmdMap:     make(map[cmdType]reflect.Type),
 		cmdTypeMap: make(map[reflect.Type]cmdType),
@@ -122,12 +122,12 @@ func (sel *Packer) RegisterMsg(msgType uint16, msg Message) {
 	sel.cmdTypeMap[tp] = cmd
 }
 
-func (sel *Packer) ReadPkg(r io.Reader) (*Package, error) {
+func (sel *Packer) ReadFrame(r io.Reader) (*CmdFrame, error) {
 	cmd, data, err := sel.readData(r)
 	if err != nil {
 		return nil, err
 	}
-	return &Package{Cmd: cmd, Payload: data}, nil
+	return &CmdFrame{Cmd: cmd, Payload: data}, nil
 }
 
 func (sel *Packer) unpack(typeByte cmdType, buffer []byte, msgIn Message) (msg Message, err error) {
@@ -146,11 +146,6 @@ func (sel *Packer) unpack(typeByte cmdType, buffer []byte, msgIn Message) (msg M
 	}
 	err = sonic.Unmarshal(buffer, &msg)
 	return
-}
-
-func (sel *Packer) ReadString(r io.Reader) (string, error) {
-	_, data, err := sel.readData(r)
-	return string(data), err
 }
 
 func (sel *Packer) pack(cmd cmdType, msg []byte) []byte {
@@ -185,6 +180,11 @@ func (sel *Packer) decodeMsg(msg Message) (data []byte, err error) {
 	return
 }
 
+func (sel *Packer) ReadString(r io.Reader) (string, error) {
+	_, data, err := sel.readData(r)
+	return string(data), err
+}
+
 func (sel *Packer) WriteString(c io.Writer, msg string) error {
 	_, err := sel.writeData(c, 0, []byte(msg))
 	return err
@@ -211,7 +211,7 @@ func (sel *Packer) WriteMsg(c io.Writer, msg Message) (err error) {
 	return nil
 }
 
-func (sel *Packer) WritePkg(c io.Writer, p *Package) error {
+func (sel *Packer) WriteFrame(c io.Writer, p *CmdFrame) error {
 	if p == nil {
 		return ErrPackageNil
 	}
@@ -220,4 +220,14 @@ func (sel *Packer) WritePkg(c io.Writer, p *Package) error {
 	}
 	_, err := sel.writeData(c, p.Cmd, p.Payload)
 	return err
+}
+
+func (sel *Packer) Write(c io.Writer, data []byte) error {
+	_, err := sel.writeData(c, 0, data)
+	return err
+}
+
+func (sel *Packer) Read(r io.Reader) ([]byte, error) {
+	_, data, err := sel.readData(r)
+	return data, err
 }
